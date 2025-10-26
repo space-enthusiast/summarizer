@@ -22,13 +22,152 @@ const colorPalettes = [
   { primary: '#ff8a80', secondary: '#ea4c89', name: 'red' }
 ];
 
+// Analyze the page colors and match to the closest palette
+function analyzePageColors() {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  
+  // Create a temporary canvas to capture page colors
+  // Note: We can't directly capture the page due to CORS, so we'll sample elements
+  const sampleSize = 50;
+  const colorCount = {};
+  
+  // Sample colors from visible elements
+  const allElements = document.querySelectorAll('*');
+  const visibleElements = Array.from(allElements).filter(el => {
+    const style = window.getComputedStyle(el);
+    return style.display !== 'none' && 
+           style.visibility !== 'hidden' && 
+           style.opacity !== '0' &&
+           el.offsetWidth > 0 && 
+           el.offsetHeight > 0;
+  });
+  
+  visibleElements.slice(0, 100).forEach(el => {
+    const bgColor = window.getComputedStyle(el).backgroundColor;
+    const textColor = window.getComputedStyle(el).color;
+    
+    if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+      const key = bgColor;
+      colorCount[key] = (colorCount[key] || 0) + 1;
+    }
+    if (textColor && textColor !== 'rgba(0, 0, 0, 0)' && textColor !== 'transparent') {
+      const key = textColor;
+      colorCount[key] = (colorCount[key] || 0) + 1;
+    }
+  });
+  
+  // Find the most common colors
+  const sortedColors = Object.entries(colorCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([color]) => color);
+  
+  // Convert to RGB and find the dominant hue
+  let dominantHue = 0;
+  if (sortedColors.length > 0) {
+    const rgb = parseRGB(sortedColors[0]);
+    dominantHue = rgbToHue(rgb);
+  }
+  
+  return findMatchingPalette(dominantHue);
+}
+
+// Parse RGB from CSS color string
+function parseRGB(colorStr) {
+  const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (match) {
+    return {
+      r: parseInt(match[1]),
+      g: parseInt(match[2]),
+      b: parseInt(match[3])
+    };
+  }
+  // Handle hex colors
+  const hexMatch = colorStr.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (hexMatch) {
+    return {
+      r: parseInt(hexMatch[1], 16),
+      g: parseInt(hexMatch[2], 16),
+      b: parseInt(hexMatch[3], 16)
+    };
+  }
+  return { r: 0, g: 0, b: 0 };
+}
+
+// Convert RGB to HSL hue (0-360)
+function rgbToHue(rgb) {
+  const r = rgb.r / 255;
+  const g = rgb.g / 255;
+  const b = rgb.b / 255;
+  
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  
+  let hue = 0;
+  if (delta !== 0) {
+    if (max === r) {
+      hue = ((g - b) / delta) % 6;
+    } else if (max === g) {
+      hue = (b - r) / delta + 2;
+    } else {
+      hue = (r - g) / delta + 4;
+    }
+  }
+  hue = Math.round(hue * 60);
+  if (hue < 0) hue += 360;
+  
+  return hue;
+}
+
+// Find the palette that best matches the dominant hue
+function findMatchingPalette(hue) {
+  const paletteHues = {
+    'purple': 270,
+    'pink': 340,
+    'blue': 210,
+    'green': 120,
+    'coral': 10,
+    'cyan': 180,
+    'mint': 160,
+    'rose': 350,
+    'peach': 30,
+    'red': 0
+  };
+  
+  let closestPalette = colorPalettes[0];
+  let minDiff = 360;
+  
+  colorPalettes.forEach(palette => {
+    const paletteHue = paletteHues[palette.name];
+    const diff = Math.min(
+      Math.abs(hue - paletteHue),
+      360 - Math.abs(hue - paletteHue)
+    );
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestPalette = palette;
+    }
+  });
+  
+  return closestPalette;
+}
+
 // Get or set a color for this tab
 function getTabColor() {
   let tabColor = sessionStorage.getItem('tabColor');
   if (!tabColor) {
-    // Pick a random color from the palettes
-    const randomPalette = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
-    tabColor = randomPalette;
+    // Analyze page colors and match to closest palette
+    try {
+      tabColor = analyzePageColors();
+    } catch (error) {
+      console.log('Error analyzing colors, using random palette:', error);
+      // Fallback to random if analysis fails
+      tabColor = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
+    }
     sessionStorage.setItem('tabColor', JSON.stringify(tabColor));
   } else {
     tabColor = JSON.parse(tabColor);
