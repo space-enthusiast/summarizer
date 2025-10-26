@@ -23,7 +23,6 @@ function showPopup(text) {
     <div class="popup-content">
       <div class="popup-header">
         <h3>Selected Text</h3>
-        <button class="close-btn" onclick="this.closest('#text-selector-popup').remove()">×</button>
       </div>
       <div class="popup-body" id="popup-body-content">
         <div class="loading-container">
