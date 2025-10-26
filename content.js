@@ -1,7 +1,33 @@
+// Check if Chrome AI is available
+let aiAvailable = false;
+let aiSession = null;
+
+// Initialize AI on page load
+(async function initAI() {
+  try {
+    if ('ai' in self && 'summarizer' in self.ai) {
+      const availability = await self.ai.summarizer.capabilities();
+      if (availability.available === 'readily') {
+        aiAvailable = true;
+        console.log('Chrome AI is available and ready!');
+      } else if (availability.available === 'after-download') {
+        console.log('Chrome AI is available but needs to download the model first');
+        aiAvailable = true;
+      } else {
+        console.log('Chrome AI is not available on this device');
+      }
+    } else {
+      console.log('Chrome AI API is not supported in this browser');
+    }
+  } catch (error) {
+    console.log('Error checking AI availability:', error);
+  }
+})();
+
 // Listen for text selection events
-document.addEventListener('mouseup', function() {
+document.addEventListener('mouseup', async function() {
   const selectedText = window.getSelection().toString().trim();
-  
+
   if (selectedText.length > 0) {
     // Show popup immediately with loading screen
     showPopup(selectedText);
@@ -316,13 +342,48 @@ function showPopup(text) {
   document.head.appendChild(style);
   document.body.appendChild(popup);
 
-  // Sleep for a certain time, then show the text
-  setTimeout(() => {
+  // Use AI to summarize the text if available
+  (async () => {
     const popupBody = document.getElementById('popup-body-content');
-    if (popupBody) {
-      popupBody.innerHTML = `<p>${escapeHtml(text)}</p>`;
+    if (!popupBody) return;
+
+    if (!aiAvailable) {
+      // AI is not available
+      popupBody.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+          <p style="color: #e74c3c; font-weight: 600; margin-bottom: 10px;">⚠️ Chrome AI Not Available</p>
+          <p style="color: #666; font-size: 14px;">Chrome's built-in AI is not supported in this browser or device.</p>
+          <p style="color: #999; font-size: 12px; margin-top: 10px;">Please use Chrome 127+ with AI features enabled.</p>
+        </div>
+      `;
+      return;
     }
-  }, 2000); // Sleep for 2 seconds (2000ms)
+
+    try {
+      // Create summarizer session if not exists
+      if (!aiSession) {
+        aiSession = await self.ai.summarizer.create();
+      }
+
+      // Generate summary
+      const summary = await aiSession.summarize(text);
+
+      popupBody.innerHTML = `
+        <div style="margin-bottom: 12px;">
+          <p style="font-weight: 600; color: ${colors.primary}; margin-bottom: 8px;">Summary:</p>
+          <p style="line-height: 1.6;">${escapeHtml(summary)}</p>
+        </div>
+      `;
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      popupBody.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+          <p style="color: #e74c3c; font-weight: 600; margin-bottom: 10px;">❌ Error</p>
+          <p style="color: #666; font-size: 14px;">Failed to generate summary: ${escapeHtml(error.message)}</p>
+        </div>
+      `;
+    }
+  })();
 
   // Auto-remove after 8 seconds (2 second loading + 6 second display)
   setTimeout(() => {
