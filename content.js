@@ -8,6 +8,34 @@ document.addEventListener('mouseup', function() {
   }
 });
 
+// Color palettes for different themes
+const colorPalettes = [
+  { primary: '#667eea', secondary: '#764ba2', name: 'purple' },
+  { primary: '#f093fb', secondary: '#f5576c', name: 'pink' },
+  { primary: '#4facfe', secondary: '#00f2fe', name: 'blue' },
+  { primary: '#43e97b', secondary: '#38f9d7', name: 'green' },
+  { primary: '#fa709a', secondary: '#fee140', name: 'coral' },
+  { primary: '#30cfd0', secondary: '#330867', name: 'cyan' },
+  { primary: '#a8edea', secondary: '#fed6e3', name: 'mint' },
+  { primary: '#ff9a9e', secondary: '#fecfef', name: 'rose' },
+  { primary: '#ffecd2', secondary: '#fcb69f', name: 'peach' },
+  { primary: '#ff8a80', secondary: '#ea4c89', name: 'red' }
+];
+
+// Get or set a color for this tab
+function getTabColor() {
+  let tabColor = sessionStorage.getItem('tabColor');
+  if (!tabColor) {
+    // Pick a random color from the palettes
+    const randomPalette = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
+    tabColor = randomPalette;
+    sessionStorage.setItem('tabColor', JSON.stringify(tabColor));
+  } else {
+    tabColor = JSON.parse(tabColor);
+  }
+  return tabColor;
+}
+
 // Function to show a custom HTML popup
 function showPopup(text) {
   // Remove any existing popup
@@ -15,6 +43,9 @@ function showPopup(text) {
   if (existingPopup) {
     existingPopup.remove();
   }
+
+  // Get the color for this tab
+  const colors = getTabColor();
 
   // Create popup element with loading state
   const popup = document.createElement('div');
@@ -64,7 +95,7 @@ function showPopup(text) {
     }
     
     .popup-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);
       color: white;
       padding: 20px;
       border-radius: 12px 12px 0 0;
@@ -125,7 +156,7 @@ function showPopup(text) {
       width: 40px;
       height: 40px;
       border: 4px solid #f3f3f3;
-      border-top: 4px solid #667eea;
+      border-top: 4px solid ${colors.primary};
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin-bottom: 16px;
@@ -137,7 +168,7 @@ function showPopup(text) {
     }
     
     .loading-container p {
-      color: #667eea;
+      color: #333;
       font-weight: 500;
       margin: 0;
     }
