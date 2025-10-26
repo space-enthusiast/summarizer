@@ -3,6 +3,7 @@ document.addEventListener('mouseup', function() {
   const selectedText = window.getSelection().toString().trim();
   
   if (selectedText.length > 0) {
+    // Show popup immediately with loading screen
     showPopup(selectedText);
   }
 });
@@ -15,7 +16,7 @@ function showPopup(text) {
     existingPopup.remove();
   }
 
-  // Create popup element
+  // Create popup element with loading state
   const popup = document.createElement('div');
   popup.id = 'text-selector-popup';
   popup.innerHTML = `
@@ -24,8 +25,11 @@ function showPopup(text) {
         <h3>Selected Text</h3>
         <button class="close-btn" onclick="this.closest('#text-selector-popup').remove()">×</button>
       </div>
-      <div class="popup-body">
-        <p>${escapeHtml(text)}</p>
+      <div class="popup-body" id="popup-body-content">
+        <div class="loading-container">
+          <div class="spinner"></div>
+          <p>Generating text...</p>
+        </div>
       </div>
     </div>
   `;
@@ -109,15 +113,53 @@ function showPopup(text) {
       line-height: 1.6;
       word-wrap: break-word;
     }
+    
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-container p {
+      color: #667eea;
+      font-weight: 500;
+      margin: 0;
+    }
   `;
   
   document.head.appendChild(style);
   document.body.appendChild(popup);
 
-  // Auto-remove after 5 seconds
+  // Sleep for a certain time, then show the text
+  setTimeout(() => {
+    const popupBody = document.getElementById('popup-body-content');
+    if (popupBody) {
+      popupBody.innerHTML = `<p>${escapeHtml(text)}</p>`;
+    }
+  }, 2000); // Sleep for 2 seconds (2000ms)
+
+  // Auto-remove after 8 seconds (2 second loading + 6 second display)
   setTimeout(() => {
     popup.remove();
-  }, 5000);
+  }, 8000);
 }
 
 // Helper function to escape HTML
