@@ -22,7 +22,6 @@ function showPopup(text) {
   popup.innerHTML = `
     <div class="popup-content">
       <div class="popup-header">
-        <h3>Selected Text</h3>
       </div>
       <div class="popup-body" id="popup-body-content">
         <div class="loading-container">
