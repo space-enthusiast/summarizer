@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Simple Extension",
+  "name": "Drag to summarize",
   "version": "1.0",
-  "description": "A minimal Chrome extension",
+  "description": "A minimal extension to summarize text on a webpage using Chrome's built-in AI",
   "action": {
     "default_popup": "popup.html"
   },
