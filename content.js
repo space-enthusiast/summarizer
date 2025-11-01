@@ -5,16 +5,28 @@ let aiSession = null;
 // Initialize AI on page load
 (async function initAI() {
   try {
-    if ('ai' in self && 'summarizer' in self.ai) {
+    if ('Summarizer' in self) {
+      const state = await Summarizer.availability();
+      const isAvailableNow = state === 'available';
+      const isPendingDownload = state === 'downloadable' || state === 'downloading';
+      
+      if (isAvailableNow || isPendingDownload) {
+        aiAvailable = true;
+        console.log('Chrome AI is available! State:', state);
+      } else {
+        console.log('Chrome AI is not available on this device. State:', state);
+      }
+    } else if ('ai' in self && 'summarizer' in self.ai) {
+      // Fallback to older ai.summarizer API
       const availability = await self.ai.summarizer.capabilities();
       if (availability.available === 'readily') {
         aiAvailable = true;
-        console.log('Chrome AI is available and ready!');
+        console.log('Chrome AI is available! (legacy API)');
       } else if (availability.available === 'after-download') {
-        console.log('Chrome AI is available but needs to download the model first');
         aiAvailable = true;
+        console.log('Chrome AI is available but needs to download the model first (legacy API)');
       } else {
-        console.log('Chrome AI is not available on this device');
+        console.log('Chrome AI is not available on this device (legacy API)');
       }
     } else {
       console.log('Chrome AI API is not supported in this browser');
@@ -362,7 +374,18 @@ function showPopup(text) {
     try {
       // Create summarizer session if not exists
       if (!aiSession) {
-        aiSession = await self.ai.summarizer.create();
+        if ('Summarizer' in self) {
+          aiSession = await Summarizer.create({
+            type: 'key-points',
+            format: 'plain-text',
+            length: 'medium'
+          });
+        } else if ('ai' in self && 'summarizer' in self.ai) {
+          // Fallback to legacy API
+          aiSession = await self.ai.summarizer.create();
+        } else {
+          throw new Error('No summarizer API available');
+        }
       }
 
       // Generate summary
