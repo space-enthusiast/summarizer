@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrome Summarizer API Test</title>
+</head>
+<body>
+    <h1>Chrome Summarizer API Test</h1>
+
+    <div>
+        <h2>Input Text</h2>
+        <textarea id="inputText" rows="10" cols="80">
+The Internet is a global network of billions of computers and other electronic devices. With the Internet, it's possible to access almost any information, communicate with anyone else in the world, and do much more. You can do all of this by connecting a computer to the Internet, which is also called going online. When someone says a computer is online, it's just another way of saying it's connected to the Internet. The World Wide Web—usually called the Web for short—is a collection of different websites you can access through the Internet. A website is made up of related text, images, and other resources. Websites can resemble other forms of media—like newspaper articles or television programs—or they can be interactive in a way that's unique to computers. The purpose of a website can be almost anything: a news platform, an advertisement, an online library, a forum for sharing images, or an educational site.
+        </textarea>
+    </div>
+
+    <div>
+        <h2>Options</h2>
+        <label>Type:
+            <select id="summaryType">
+                <option value="key-points">Key Points</option>
+                <option value="tldr">TL;DR</option>
+                <option value="teaser">Teaser</option>
+                <option value="headline">Headline</option>
+            </select>
+        </label>
+        <br><br>
+        <label>Format:
+            <select id="summaryFormat">
+                <option value="markdown">Markdown</option>
+                <option value="plain-text">Plain Text</option>
+            </select>
+        </label>
+        <br><br>
+        <label>Length:
+            <select id="summaryLength">
+                <option value="short">Short</option>
+                <option value="medium" selected>Medium</option>
+                <option value="long">Long</option>
+            </select>
+        </label>
+    </div>
+
+    <div>
+        <br>
+        <button onclick="checkAvailability()">Check Availability</button>
+        <button id="downloadButton" onclick="downloadModel()" style="display: none;">Download Model</button>
+        <button onclick="summarizeText()">Summarize</button>
+        <button onclick="summarizeStreaming()">Summarize (Streaming)</button>
+    </div>
+
+    <div>
+        <h2>Status</h2>
+        <p id="status">Ready</p>
+        <p id="downloadProgress" style="display: none; margin-top: 10px;"></p>
+    </div>
+
+    <div>
+        <h2>Summary Output</h2>
+        <pre id="output"></pre>
+    </div>
+
+    <script>
+        let summarizer = null;
+
+        async function checkAvailability() {
+            const status = document.getElementById('status');
+            const output = document.getElementById('output');
+            const downloadButton = document.getElementById('downloadButton');
+            const downloadProgress = document.getElementById('downloadProgress');
+
+            try {
+                if (!('Summarizer' in self)) {
+                    output.textContent = 'Available: false (API not supported)';
+                    status.textContent = 'Not available';
+                    status.style.color = 'red';
+                    downloadButton.style.display = 'none';
+                    downloadProgress.style.display = 'none';
+                    return;
+                }
+
+                const state = await Summarizer.availability();
+                // States per docs: 'unavailable' | 'downloadable' | 'downloading' | 'available'
+                const isAvailableNow = state === 'available';
+                const isPendingDownload = state === 'downloadable' || state === 'downloading';
+                const isAvailableBool = isAvailableNow || isPendingDownload; // consider downloadable/downloading as true (pending)
+
+                output.textContent = 'Available: ' + isAvailableBool + ' (' + state + ')';
+                status.textContent = isAvailableNow
+                    ? 'Available'
+                    : (isPendingDownload ? (state === 'downloading' ? 'Downloading model…' : 'Available after download') : 'Not available');
+                status.style.color = isAvailableNow ? 'green' : (isPendingDownload ? 'goldenrod' : 'red');
+                
+                // Show download button if model is downloadable
+                if (state === 'downloadable') {
+                    downloadButton.style.display = 'inline-block';
+                    downloadProgress.style.display = 'none';
+                } else {
+                    downloadButton.style.display = 'none';
+                    if (state === 'downloading') {
+                        downloadProgress.style.display = 'block';
+                    } else {
+                        downloadProgress.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                output.textContent = 'Available: false (Error: ' + error.message + ')';
+                status.textContent = 'Not available';
+                status.style.color = 'red';
+                downloadButton.style.display = 'none';
+                downloadProgress.style.display = 'none';
+            }
+        }
+
+        async function summarizeText() {
+            const status = document.getElementById('status');
+            const output = document.getElementById('output');
+            const inputText = document.getElementById('inputText').value;
+            const summaryType = document.getElementById('summaryType').value;
+            const summaryFormat = document.getElementById('summaryFormat').value;
+            const summaryLength = document.getElementById('summaryLength').value;
+
+            try {
+                status.textContent = 'Creating summarizer...';
+
+                if (!('Summarizer' in self)) {
+                    throw new Error('Summarizer API not supported');
+                }
+
+                summarizer = await Summarizer.create({
+                    type: summaryType,
+                    format: summaryFormat,
+                    length: summaryLength
+                });
+
+                status.textContent = 'Summarizing...';
+                const summary = await summarizer.summarize(inputText);
+
+                output.textContent = summary;
+                status.textContent = 'Summary complete';
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                status.textContent = 'Error occurred';
+                console.error(error);
+            }
+        }
+
+        async function downloadModel() {
+            const status = document.getElementById('status');
+            const output = document.getElementById('output');
+            const downloadButton = document.getElementById('downloadButton');
+            const downloadProgress = document.getElementById('downloadProgress');
+
+            try {
+                if (!('Summarizer' in self)) {
+                    throw new Error('Summarizer API not supported');
+                }
+
+                // Check for user activation before creating the summarizer
+                if (!navigator.userActivation.isActive) {
+                    output.textContent = 'Error: User activation required. Please click the button again.';
+                    status.textContent = 'User activation required';
+                    status.style.color = 'red';
+                    return;
+                }
+
+                status.textContent = 'Starting model download...';
+                status.style.color = 'goldenrod';
+                downloadButton.disabled = true;
+                downloadProgress.style.display = 'block';
+                downloadProgress.textContent = 'Downloading: 0%';
+
+                const summaryType = document.getElementById('summaryType').value;
+                const summaryFormat = document.getElementById('summaryFormat').value;
+                const summaryLength = document.getElementById('summaryLength').value;
+
+                // Create summarizer with monitor to track download progress
+                summarizer = await Summarizer.create({
+                    type: summaryType,
+                    format: summaryFormat,
+                    length: summaryLength,
+                    monitor(m) {
+                        m.addEventListener('downloadprogress', (e) => {
+                            const percent = Math.round(e.loaded * 100);
+                            downloadProgress.textContent = `Downloading: ${percent}%`;
+                            status.textContent = `Downloading model: ${percent}%`;
+                        });
+                    }
+                });
+
+                // After download completes, check availability again
+                const newState = await Summarizer.availability();
+                downloadProgress.style.display = 'none';
+                downloadButton.style.display = 'none';
+                downloadButton.disabled = false;
+
+                if (newState === 'available') {
+                    status.textContent = 'Model downloaded successfully!';
+                    status.style.color = 'green';
+                    output.textContent = 'Model is now available and ready to use.';
+                } else {
+                    status.textContent = 'Download completed. Status: ' + newState;
+                    status.style.color = 'goldenrod';
+                    output.textContent = 'Download completed. Current state: ' + newState;
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                status.textContent = 'Download failed';
+                status.style.color = 'red';
+                downloadButton.disabled = false;
+                downloadProgress.style.display = 'none';
+                console.error(error);
+            }
+        }
+
+        async function summarizeStreaming() {
+            const status = document.getElementById('status');
+            const output = document.getElementById('output');
+            const inputText = document.getElementById('inputText').value;
+            const summaryType = document.getElementById('summaryType').value;
+            const summaryFormat = document.getElementById('summaryFormat').value;
+            const summaryLength = document.getElementById('summaryLength').value;
+
+            try {
+                status.textContent = 'Creating summarizer...';
+                output.textContent = '';
+
+                if (!('Summarizer' in self)) {
+                    throw new Error('Summarizer API not supported');
+                }
+
+                summarizer = await Summarizer.create({
+                    type: summaryType,
+                    format: summaryFormat,
+                    length: summaryLength
+                });
+
+                status.textContent = 'Streaming summary...';
+
+                const stream = await summarizer.summarizeStreaming(inputText);
+                let chunkCount = 0;
+                let fullText = '';
+                for await (const chunk of stream) {
+                    chunkCount++;
+                    console.log(`Chunk ${chunkCount}:`, chunk);
+                    fullText += chunk;
+                    output.textContent = fullText;
+                    status.textContent = `Streaming... (chunk ${chunkCount})`;
+                }
+
+                status.textContent = `Streaming complete (${chunkCount} chunks)`;
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                status.textContent = 'Error occurred';
+                console.error(error);
+            }
+        }
+
+        // Check availability automatically when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            checkAvailability();
+        });
+    </script>
+</body>
+</html>
