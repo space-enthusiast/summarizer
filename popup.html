@@ -88,6 +88,47 @@
       line-height: 1.4;
       margin-top: 12px;
     }
+
+    button {
+      width: 100%;
+      padding: 10px 16px;
+      margin-top: 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s, opacity 0.2s;
+      font-family: inherit;
+    }
+
+    .download-button {
+      background: #ff9800;
+      color: white;
+    }
+
+    .download-button:hover:not(:disabled) {
+      background: #f57c00;
+    }
+
+    .download-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .download-progress {
+      margin-top: 12px;
+      padding: 10px;
+      background: #fff3cd;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #856404;
+      display: none;
+    }
+
+    .download-progress.show {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -101,6 +142,12 @@
       </span>
     </div>
   </div>
+
+  <button id="download-button" class="download-button" style="display: none;">
+    Download Model
+  </button>
+
+  <div id="download-progress" class="download-progress"></div>
 
   <p class="info-text">
     Select any text on a webpage to generate a summary using Chrome's built-in AI.
