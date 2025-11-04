@@ -1,3 +1,26 @@
+// Storage helpers for persistent download state
+async function saveDownloadState(state, progress = 0) {
+  await chrome.storage.local.set({
+    downloadState: state,
+    downloadProgress: progress,
+    downloadTimestamp: Date.now()
+  });
+}
+
+async function getDownloadState() {
+  const result = await chrome.storage.local.get(['downloadState', 'downloadProgress', 'downloadTimestamp']);
+  // Clear state if it's older than 1 hour (stale state)
+  if (result.downloadTimestamp && Date.now() - result.downloadTimestamp > 3600000) {
+    await clearDownloadState();
+    return null;
+  }
+  return result.downloadState ? result : null;
+}
+
+async function clearDownloadState() {
+  await chrome.storage.local.remove(['downloadState', 'downloadProgress', 'downloadTimestamp']);
+}
+
 // Check Chrome AI summarizer availability
 async function checkAIStatus() {
   const statusElement = document.getElementById('ai-status');
@@ -5,6 +28,9 @@ async function checkAIStatus() {
   const downloadProgress = document.getElementById('download-progress');
 
   try {
+    // Check for persisted download state
+    const persistedState = await getDownloadState();
+
     // Try Summarizer API first (reference pattern)
     let state = null;
     let isAvailable = false;
@@ -31,6 +57,24 @@ async function checkAIStatus() {
       statusElement.textContent = '✗ Not Supported';
       downloadButton.style.display = 'none';
       downloadProgress.classList.remove('show');
+      return;
+    }
+
+    // If download completed, clear persisted state
+    if (state === 'available' && persistedState) {
+      await clearDownloadState();
+    }
+
+    // Use persisted state if download is ongoing
+    if (persistedState && persistedState.downloadState === 'downloading' && state !== 'available') {
+      state = 'downloading';
+      // Restore progress if available
+      const progress = persistedState.downloadProgress || 0;
+      statusElement.className = 'status-value status-download';
+      statusElement.textContent = progress > 0 ? `⬇ Downloading: ${progress}%` : '⬇ Downloading...';
+      downloadButton.style.display = 'none';
+      downloadProgress.classList.add('show');
+      downloadProgress.textContent = progress > 0 ? `Downloading: ${progress}%` : 'Downloading model...';
       return;
     }
 
@@ -80,16 +124,18 @@ async function downloadModel() {
         throw new Error('Summarizer API not supported');
       }
       // For ai.summarizer API, creating a session will trigger download
+      await saveDownloadState('downloading', 0);
       statusElement.className = 'status-value status-download';
       statusElement.textContent = '⬇ Downloading...';
       downloadButton.disabled = true;
       downloadProgress.classList.add('show');
       downloadProgress.textContent = 'Downloading model...';
-      
+
       // Create session which will download the model
       await self.ai.summarizer.create();
-      
-      // Recheck availability
+
+      // Clear download state and recheck availability
+      await clearDownloadState();
       await checkAIStatus();
       return;
     }
@@ -101,6 +147,8 @@ async function downloadModel() {
       return;
     }
 
+    // Save initial download state
+    await saveDownloadState('downloading', 0);
     statusElement.className = 'status-value status-download';
     statusElement.textContent = '⬇ Downloading...';
     downloadButton.disabled = true;
@@ -117,11 +165,14 @@ async function downloadModel() {
           const percent = Math.round(e.loaded * 100);
           downloadProgress.textContent = `Downloading: ${percent}%`;
           statusElement.textContent = `⬇ Downloading: ${percent}%`;
+          // Persist progress
+          saveDownloadState('downloading', percent);
         });
       }
     });
 
-    // After download completes, check availability again
+    // After download completes, clear persisted state and check availability
+    await clearDownloadState();
     const newState = await Summarizer.availability();
     downloadProgress.classList.remove('show');
     downloadButton.disabled = false;
@@ -137,6 +188,7 @@ async function downloadModel() {
     }
   } catch (error) {
     console.error('Error downloading model:', error);
+    await clearDownloadState();
     statusElement.className = 'status-value status-unavailable';
     statusElement.textContent = '✗ Download Failed';
     downloadButton.disabled = false;
